@@ -54,6 +54,7 @@ export class MessagingProcessFolderActionsService {
         const folderIdsToDelete: string[] = [];
         const folderIdsToImport: string[] = [];
         const processedFolderIds: string[] = [];
+        const failedFolderIds: Array<{ folderId: string; error: Error }> = [];
 
         for (const folder of foldersWithPendingActions) {
           try {
@@ -93,8 +94,14 @@ export class MessagingProcessFolderActionsService {
               `WorkspaceId: ${workspaceId}, MessageChannelId: ${messageChannel.id}, FolderId: ${folder.id} - Error processing folder action: ${error.message}`,
               error.stack,
             );
-            throw error;
+            failedFolderIds.push({ folderId: folder.id, error });
           }
+        }
+
+        if (failedFolderIds.length > 0) {
+          this.logger.warn(
+            `WorkspaceId: ${workspaceId}, MessageChannelId: ${messageChannel.id} - Failed to process ${failedFolderIds.length} folders. They will be retried on next sync.`,
+          );
         }
 
         if (folderIdsToImport.length > 0) {
