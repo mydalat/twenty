@@ -37,10 +37,14 @@ type MessageFolderToInsert = Pick<
   | 'isSynced'
   | 'isSentFolder'
   | 'externalId'
+  | 'parentFolderId'
 >;
 
 type MessageFolderToUpdate = Partial<
-  Pick<MessageFolderWorkspaceEntity, 'name' | 'externalId' | 'isSentFolder'>
+  Pick<
+    MessageFolderWorkspaceEntity,
+    'name' | 'externalId' | 'isSentFolder' | 'parentFolderId'
+  >
 >;
 
 @Injectable()
@@ -122,6 +126,7 @@ export class SyncMessageFoldersService {
             name: folder.name,
             externalId: folder.externalId,
             isSentFolder: folder.isSentFolder,
+            parentFolderId: folder.parentFolderId,
           },
         ]);
         continue;
@@ -135,6 +140,7 @@ export class SyncMessageFoldersService {
         isSynced: folder.isSynced,
         isSentFolder: folder.isSentFolder,
         externalId: folder.externalId,
+        parentFolderId: folder.parentFolderId,
       });
     }
 

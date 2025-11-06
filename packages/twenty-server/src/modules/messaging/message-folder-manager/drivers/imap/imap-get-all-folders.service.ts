@@ -9,8 +9,6 @@ import {
 } from 'src/modules/messaging/message-folder-manager/interfaces/message-folder-driver.interface';
 
 import { type ConnectedAccountWorkspaceEntity } from 'src/modules/connected-account/standard-objects/connected-account.workspace-entity';
-import { MessageChannelWorkspaceEntity } from 'src/modules/messaging/common/standard-objects/message-channel.workspace-entity';
-import { shouldSyncFolder } from 'src/modules/messaging/message-folder-manager/utils/should-sync-folder.util';
 import { ImapClientProvider } from 'src/modules/messaging/message-import-manager/drivers/imap/providers/imap-client.provider';
 import { ImapFindSentFolderService } from 'src/modules/messaging/message-import-manager/drivers/imap/services/imap-find-sent-folder.service';
 import { MessageFolderName } from 'src/modules/messaging/message-import-manager/drivers/imap/types/folders';
@@ -31,18 +29,13 @@ export class ImapGetAllFoldersService implements MessageFolderDriver {
       ConnectedAccountWorkspaceEntity,
       'id' | 'provider' | 'connectionParameters' | 'handle'
     >,
-    messageChannel: Pick<MessageChannelWorkspaceEntity, 'syncAllFolders'>,
   ): Promise<MessageFolder[]> {
     try {
       const client = await this.imapClientProvider.getClient(connectedAccount);
 
       const mailboxList = await client.list();
 
-      const folders = await this.filterAndMapFolders(
-        client,
-        mailboxList,
-        messageChannel,
-      );
+      const folders = await this.filterAndMapFolders(client, mailboxList);
 
       await this.imapClientProvider.closeClient(client);
 
@@ -60,50 +53,66 @@ export class ImapGetAllFoldersService implements MessageFolderDriver {
   private async filterAndMapFolders(
     client: ImapFlow,
     mailboxList: ListResponse[],
-    messageChannel: Pick<MessageChannelWorkspaceEntity, 'syncAllFolders'>,
   ): Promise<MessageFolder[]> {
     const folders: MessageFolder[] = [];
-    const sentFolderPath =
+    const pathToExternalIdMap = new Map<string, string>();
+    const sentFolder =
       await this.imapFindSentFolderService.findSentFolder(client);
 
-    if (isDefined(sentFolderPath)) {
-      const sentMailbox = mailboxList.find((m) => m.path === sentFolderPath);
+    if (isDefined(sentFolder)) {
+      const sentMailbox = mailboxList.find((m) => m.path === sentFolder.path);
       const uidValidity = sentMailbox
         ? await this.getUidValidity(client, sentMailbox)
         : null;
 
+      const externalId = uidValidity
+        ? `${sentFolder.path}:${uidValidity.toString()}`
+        : sentFolder.path;
+
+      pathToExternalIdMap.set(sentFolder.path, externalId);
+
       folders.push({
-        externalId: uidValidity
-          ? `${sentFolderPath}:${uidValidity.toString()}`
-          : sentFolderPath,
-        name: sentFolderPath,
+        externalId,
+        name: sentFolder.name,
         isSynced: true,
         isSentFolder: true,
+        parentFolderId: sentMailbox?.parentPath || null,
       });
     }
 
-    const validMailboxes = mailboxList.filter((mailbox) =>
-      this.isValidMailbox(mailbox, folders),
-    );
-
-    for (const mailbox of validMailboxes) {
-      const isInbox = await this.isInboxFolder(mailbox);
+    for (const mailbox of mailboxList) {
       const uidValidity = await this.getUidValidity(client, mailbox);
-      const standardFolder = getStandardFolderByRegex(mailbox.path);
-      const isSynced = shouldSyncFolder(
-        standardFolder,
-        messageChannel.syncAllFolders,
-        isInbox,
-      );
+      const externalId = uidValidity
+        ? `${mailbox.path}:${uidValidity}`
+        : mailbox.path;
 
-      folders.push({
-        externalId: uidValidity
-          ? `${mailbox.path}:${uidValidity}`
-          : mailbox.path,
-        name: mailbox.path,
-        isSynced,
-        isSentFolder: false,
-      });
+      pathToExternalIdMap.set(mailbox.path, externalId);
+
+      if (this.isValidMailbox(mailbox, folders)) {
+        const isInbox = await this.isInboxFolder(mailbox);
+        const standardFolder = getStandardFolderByRegex(mailbox.path);
+        const isSynced = this.shouldSyncByDefault(
+          mailbox,
+          standardFolder,
+          isInbox,
+        );
+
+        folders.push({
+          externalId,
+          name: mailbox.name,
+          isSynced,
+          isSentFolder: false,
+          parentFolderId: mailbox.parentPath || null,
+        });
+      }
+    }
+
+    for (const folder of folders) {
+      if (folder.parentFolderId) {
+        const parentExternalId = pathToExternalIdMap.get(folder.parentFolderId);
+
+        folder.parentFolderId = parentExternalId || null;
+      }
     }
 
     return folders;
@@ -117,9 +126,15 @@ export class ImapGetAllFoldersService implements MessageFolderDriver {
       return false;
     }
 
-    const isDuplicate = existingFolders.some(
-      (folder) => folder.name === mailbox.path,
-    );
+    const isDuplicate = existingFolders.some((folder) => {
+      const folderPath = folder?.externalId?.split(':')[0];
+
+      if (!isDefined(folderPath)) {
+        return false;
+      }
+
+      return folderPath === mailbox.path;
+    });
 
     return !isDuplicate;
   }
@@ -140,21 +155,31 @@ export class ImapGetAllFoldersService implements MessageFolderDriver {
       return true;
     }
 
+    return false;
+  }
+
+  private shouldSyncByDefault(
+    mailbox: ListResponse,
+    standardFolder: StandardFolder | null,
+    isInbox: boolean,
+  ): boolean {
     if (
       mailbox.specialUse === '\\Drafts' ||
       mailbox.specialUse === '\\Trash' ||
       mailbox.specialUse === '\\Junk'
     ) {
-      return true;
+      return false;
     }
-
-    const standardFolder = getStandardFolderByRegex(mailbox.path);
 
     if (
       standardFolder === StandardFolder.DRAFTS ||
       standardFolder === StandardFolder.TRASH ||
       standardFolder === StandardFolder.JUNK
     ) {
+      return false;
+    }
+
+    if (isInbox) {
       return true;
     }
 

@@ -7,11 +7,10 @@ import {
 
 import { OAuth2ClientManagerService } from 'src/modules/connected-account/oauth2-client-manager/services/oauth2-client-manager.service';
 import { type ConnectedAccountWorkspaceEntity } from 'src/modules/connected-account/standard-objects/connected-account.workspace-entity';
-import { MessageChannelWorkspaceEntity } from 'src/modules/messaging/common/standard-objects/message-channel.workspace-entity';
-import { shouldSyncFolder } from 'src/modules/messaging/message-folder-manager/utils/should-sync-folder.util';
+import { extractGmailFolderName } from 'src/modules/messaging/message-folder-manager/drivers/gmail/utils/extract-gmail-folder-name.util';
+import { getGmailFolderParentId } from 'src/modules/messaging/message-folder-manager/drivers/gmail/utils/get-gmail-folder-parent-id.util';
 import { MESSAGING_GMAIL_DEFAULT_NOT_SYNCED_LABELS } from 'src/modules/messaging/message-import-manager/drivers/gmail/constants/messaging-gmail-default-not-synced-labels';
-import { GmailHandleErrorService } from 'src/modules/messaging/message-import-manager/drivers/gmail/services/gmail-handle-error.service';
-import { getStandardFolderByRegex } from 'src/modules/messaging/message-import-manager/drivers/utils/get-standard-folder-by-regex';
+import { GmailMessageListFetchErrorHandler } from 'src/modules/messaging/message-import-manager/drivers/gmail/services/gmail-message-list-fetch-error-handler.service';
 
 @Injectable()
 export class GmailGetAllFoldersService implements MessageFolderDriver {
@@ -19,11 +18,11 @@ export class GmailGetAllFoldersService implements MessageFolderDriver {
 
   constructor(
     private readonly oAuth2ClientManagerService: OAuth2ClientManagerService,
-    private readonly gmailHandleErrorService: GmailHandleErrorService,
+    private readonly gmailMessageListFetchErrorHandler: GmailMessageListFetchErrorHandler,
   ) {}
 
-  private shouldExcludeLabel(labelId: string): boolean {
-    return MESSAGING_GMAIL_DEFAULT_NOT_SYNCED_LABELS.includes(labelId);
+  private isSyncedByDefault(labelId: string): boolean {
+    return !MESSAGING_GMAIL_DEFAULT_NOT_SYNCED_LABELS.includes(labelId);
   }
 
   async getAllMessageFolders(
@@ -31,7 +30,6 @@ export class GmailGetAllFoldersService implements MessageFolderDriver {
       ConnectedAccountWorkspaceEntity,
       'provider' | 'refreshToken' | 'accessToken' | 'id' | 'handle'
     >,
-    messageChannel: Pick<MessageChannelWorkspaceEntity, 'syncAllFolders'>,
   ): Promise<MessageFolder[]> {
     try {
       const oAuth2Client =
@@ -48,7 +46,7 @@ export class GmailGetAllFoldersService implements MessageFolderDriver {
             `Connected account ${connectedAccount.id}: Error fetching labels: ${error.message}`,
           );
 
-          this.gmailHandleErrorService.handleGmailMessageListFetchError(error);
+          this.gmailMessageListFetchErrorHandler.handleError(error);
 
           return { data: { labels: [] } };
         });
@@ -57,30 +55,34 @@ export class GmailGetAllFoldersService implements MessageFolderDriver {
 
       const folders: MessageFolder[] = [];
 
+      const labelNameToIdMap = new Map<string, string>();
+
       for (const label of labels) {
         if (!label.name || !label.id) {
           continue;
         }
 
-        if (this.shouldExcludeLabel(label.id)) {
+        labelNameToIdMap.set(label.name, label.id);
+      }
+
+      for (const label of labels) {
+        if (!label.name || !label.id) {
           continue;
         }
 
         const isSentFolder = label.id === 'SENT';
-        const isInbox = label.id === 'INBOX';
-
-        const standardFolder = getStandardFolderByRegex(label.name);
-        const isSynced = shouldSyncFolder(
-          standardFolder,
-          messageChannel.syncAllFolders,
-          isInbox,
+        const folderName = extractGmailFolderName(label.name);
+        const parentFolderId = getGmailFolderParentId(
+          label.name,
+          labelNameToIdMap,
         );
 
         folders.push({
           externalId: label.id,
-          name: label.name,
-          isSynced,
+          name: folderName,
+          isSynced: this.isSyncedByDefault(label.id),
           isSentFolder,
+          parentFolderId,
         });
       }
 
