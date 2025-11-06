@@ -1,17 +1,20 @@
-// TODO: Optimize query
 import { Injectable, Logger } from '@nestjs/common';
 
 import chunk from 'lodash.chunk';
 import { isDefined } from 'twenty-shared/utils';
-import { In } from 'typeorm';
 
 import { TwentyORMGlobalManager } from 'src/engine/twenty-orm/twenty-orm-global.manager';
 import { MessageChannelMessageAssociationWorkspaceEntity } from 'src/modules/messaging/common/standard-objects/message-channel-message-association.workspace-entity';
-import { type MessageParticipantWorkspaceEntity } from 'src/modules/messaging/common/standard-objects/message-participant.workspace-entity';
 import { MessagingMessageCleanerService } from 'src/modules/messaging/message-cleaner/services/messaging-message-cleaner.service';
 import { isGroupEmail } from 'src/modules/messaging/message-import-manager/utils/is-group-email';
 
 const MESSAGE_CHANNEL_MESSAGE_ASSOCIATION_BATCH_SIZE = 500;
+
+type MessageBatchRawResult = {
+  messageId: string;
+  messageExternalId: string;
+  participantHandle: string;
+};
 
 @Injectable()
 export class MessagingDeleteGroupEmailMessagesService {
@@ -32,12 +35,6 @@ export class MessagingDeleteGroupEmailMessagesService {
       `WorkspaceId: ${workspaceId}, MessageChannelId: ${messageChannelId} - Deleting messages from group email addresses`,
     );
 
-    const messageParticipantRepository =
-      await this.twentyORMGlobalManager.getRepositoryForWorkspace<MessageParticipantWorkspaceEntity>(
-        workspaceId,
-        'messageParticipant',
-      );
-
     const messageChannelMessageAssociationRepository =
       await this.twentyORMGlobalManager.getRepositoryForWorkspace<MessageChannelMessageAssociationWorkspaceEntity>(
         workspaceId,
@@ -48,43 +45,43 @@ export class MessagingDeleteGroupEmailMessagesService {
     let totalDeletedCount = 0;
 
     while (true) {
-      const associations =
-        await messageChannelMessageAssociationRepository.find({
-          where: {
-            messageChannelId,
-          },
-          select: ['messageId', 'messageExternalId'],
-          take: MESSAGE_CHANNEL_MESSAGE_ASSOCIATION_BATCH_SIZE,
-          skip: offset,
-        });
+      const batch = await messageChannelMessageAssociationRepository
+        .createQueryBuilder('mcma')
+        .select('mcma.messageId', 'messageId')
+        .addSelect('mcma.messageExternalId', 'messageExternalId')
+        .addSelect('participant.handle', 'participantHandle')
+        .innerJoin('mcma.message', 'message')
+        .innerJoin(
+          'message.messageParticipants',
+          'participant',
+          'participant.role = :role',
+          { role: 'from' },
+        )
+        .where('mcma.messageChannelId = :messageChannelId', {
+          messageChannelId,
+        })
+        .skip(offset)
+        .take(MESSAGE_CHANNEL_MESSAGE_ASSOCIATION_BATCH_SIZE)
+        .getRawMany<MessageBatchRawResult>();
 
-      if (associations.length === 0) {
+      if (batch.length === 0) {
         break;
       }
 
-      const messageIds = associations.map((assoc) => assoc.messageId);
-
-      const messageParticipants = await messageParticipantRepository.find({
-        where: {
-          messageId: In(messageIds),
-          role: 'from',
-        },
-        select: ['id', 'handle', 'messageId'],
-      });
-
-      const groupEmailParticipants = messageParticipants.filter(
-        (participant) =>
-          isDefined(participant.handle) && isGroupEmail(participant.handle),
+      const groupEmailRecords = batch.filter(
+        (record) =>
+          isDefined(record.participantHandle) &&
+          isGroupEmail(record.participantHandle),
       );
 
-      if (groupEmailParticipants.length > 0) {
-        const groupEmailMessageIds = new Set(
-          groupEmailParticipants.map((p) => p.messageId),
+      if (groupEmailRecords.length > 0) {
+        const uniqueMessageIds = new Set(
+          groupEmailRecords.map((r) => r.messageId),
         );
 
-        const messageExternalIdsToDelete = associations
-          .filter((assoc) => groupEmailMessageIds.has(assoc.messageId))
-          .map((assoc) => assoc.messageExternalId)
+        const messageExternalIdsToDelete = batch
+          .filter((record) => uniqueMessageIds.has(record.messageId))
+          .map((record) => record.messageExternalId)
           .filter(isDefined);
 
         if (messageExternalIdsToDelete.length > 0) {
@@ -111,9 +108,7 @@ export class MessagingDeleteGroupEmailMessagesService {
         }
       }
 
-      if (
-        associations.length < MESSAGE_CHANNEL_MESSAGE_ASSOCIATION_BATCH_SIZE
-      ) {
+      if (batch.length < MESSAGE_CHANNEL_MESSAGE_ASSOCIATION_BATCH_SIZE) {
         break;
       }
 
