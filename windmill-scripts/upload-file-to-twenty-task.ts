@@ -74,7 +74,6 @@ async function createTask(
   apiKey: string,
   taskData: {
     title: string;
-    body?: string;
     status?: string;
     dueAt?: string;
     assigneeId?: string;
@@ -85,7 +84,6 @@ async function createTask(
       createTask(data: $data) {
         id
         title
-        body
         status
         createdAt
       }
@@ -95,7 +93,6 @@ async function createTask(
   const variables = {
     data: {
       title: taskData.title,
-      body: taskData.body || '',
       status: taskData.status || 'TODO',
       dueAt: taskData.dueAt || null,
       assigneeId: taskData.assigneeId || null
@@ -263,7 +260,6 @@ export async function main(
 
   // Task details
   taskTitle: string = "Sample Task with Attachment",
-  taskBody: string = "This is a demo task created from Windmill with an attached file.",
   taskStatus: string = "TODO",
   taskDueAt?: string,
   taskAssigneeId?: string,
@@ -280,7 +276,6 @@ export async function main(
     console.log("\n📝 Step 1: Creating task...");
     const task = await createTask(twenty.apiUrl, twenty.apiKey, {
       title: taskTitle,
-      body: taskBody,
       status: taskStatus,
       dueAt: taskDueAt,
       assigneeId: taskAssigneeId
@@ -348,7 +343,6 @@ export async function main(
  * 2. Run this script with parameters:
  *    - twenty: u/chipvn/twenty (resource selector)
  *    - taskTitle: "Review contract"
- *    - taskBody: "Please review the attached contract"
  *    - fileName: "contract.pdf"
  *    - fileContent: <file content as string or upload via Windmill>
  *
