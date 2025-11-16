@@ -280,7 +280,41 @@ export async function main() {
 
 ---
 
+## ⚠️ Important: Twenty CRM GraphQL Naming Convention
+
+Twenty CRM uses a specific naming convention for GraphQL mutations:
+
+```
+createOne → create + PascalCase(objectName)
+updateOne → update + PascalCase(objectName)
+deleteOne → delete + PascalCase(objectName)
+```
+
+**Examples:**
+- ✅ `createOpportunity` (NOT `createOneOpportunity`)
+- ✅ `createTask` (NOT `createOneTask`)
+- ✅ `createAttachment` (NOT `createOneAttachment`)
+- ✅ `updateOpportunity` (NOT `updateOneOpportunity`)
+- ✅ `deleteTask` (NOT `deleteOneTask`)
+
+All scripts in this folder already use the correct naming convention.
+
+---
+
 ## 🔍 Troubleshooting
+
+### ❌ Error: "Cannot query field 'createOneOpportunity'" (GraphQL Error)
+
+**Cause:** Using incorrect mutation name
+
+**Solution:**
+Use `createOpportunity` instead of `createOneOpportunity`
+
+**Correct mutations:**
+- ✅ `createOpportunity`
+- ✅ `createTask`
+- ✅ `createAttachment`
+- ✅ `updateOpportunity`
 
 ### ❌ Error: "Failed to create opportunity: Not Found" (404)
 
