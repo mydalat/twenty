@@ -39,12 +39,27 @@ export const useRecordsFieldVisibleGqlFields = ({
       objectNameSingular: CoreObjectNameSingular.TaskTarget,
     });
 
+  // Generate GraphQL fields for visible fields
+  let fieldsToInclude = visibleRecordFields.map(
+    (field) =>
+      fieldMetadataItemByFieldMetadataItemId[field.fieldMetadataItemId],
+  );
+
+  // FORCE INCLUDE assignee field for tasks (even if not visible in table)
+  // This ensures relationship data is always fetched for proper display
+  if (objectMetadataItem.nameSingular === CoreObjectNameSingular.Task) {
+    const assigneeField = objectMetadataItem.fields.find(
+      (field) => field.name === 'assignee',
+    );
+
+    if (assigneeField && !fieldsToInclude.some((f) => f?.id === assigneeField.id)) {
+      fieldsToInclude.push(assigneeField);
+    }
+  }
+
   const allDepthOneGqlFields = generateDepthRecordGqlFieldsFromFields({
     objectMetadataItems,
-    fields: visibleRecordFields.map(
-      (field) =>
-        fieldMetadataItemByFieldMetadataItemId[field.fieldMetadataItemId],
-    ),
+    fields: fieldsToInclude,
     depth: 1,
   });
 
