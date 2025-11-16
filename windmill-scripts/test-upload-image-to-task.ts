@@ -130,22 +130,32 @@ async function createTask(
 }
 
 /**
- * Upload file to Twenty CRM
+ * Upload IMAGE to Twenty CRM
+ *
+ * IMPORTANT: For images, we MUST use uploadImage mutation (not uploadFile)
+ * and use a fileFolder that has crop sizes defined in settings.
+ *
+ * Available fileFolders with crop sizes:
+ * - 'profile-picture'
+ * - 'workspace-logo'
+ * - 'person-picture'
+ *
+ * We use 'person-picture' as a workaround for task attachments.
  */
 async function uploadFile(
   apiUrl: string,
   apiKey: string,
   fileBuffer: Buffer,
   fileName: string,
-  fileFolder: string = 'attachment'
+  fileFolder: string = 'person-picture'  // Changed from 'attachment'
 ): Promise<FileUploadResponse> {
   const FormData = (await import('form-data')).default;
   const formData = new FormData();
 
   const operations = {
     query: `
-      mutation UploadFile($file: Upload!, $fileFolder: FileFolder) {
-        uploadFile(file: $file, fileFolder: $fileFolder) {
+      mutation UploadImage($file: Upload!, $fileFolder: FileFolder) {
+        uploadImage(file: $file, fileFolder: $fileFolder) {
           path
           token
         }
@@ -175,7 +185,7 @@ async function uploadFile(
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Failed to upload file: ${response.statusText} - ${errorText}`);
+    throw new Error(`Failed to upload image: ${response.statusText} - ${errorText}`);
   }
 
   const result = await response.json();
@@ -184,7 +194,7 @@ async function uploadFile(
     throw new Error(`GraphQL errors: ${JSON.stringify(result.errors)}`);
   }
 
-  return result.data.uploadFile;
+  return result.data.uploadImage;
 }
 
 /**
@@ -307,12 +317,14 @@ export async function main(
 
     // Step 3: Upload Image
     console.log("\n📤 Step 3: Uploading image...");
+    console.log(`   Note: Using 'person-picture' fileFolder (has crop sizes defined)`);
+    console.log(`   This is a workaround since 'attachment' doesn't support images`);
     const uploadResult = await uploadFile(
       twenty.apiUrl,
       twenty.apiKey,
       imageBuffer,
       imageName,
-      'attachment'
+      'person-picture'  // Use fileFolder with crop sizes defined
     );
     console.log(`✅ Image uploaded successfully`);
     console.log(`   Path: ${uploadResult.path}`);
