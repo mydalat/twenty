@@ -4,6 +4,13 @@ This folder contains Windmill scripts demonstrating how to upload files and crea
 
 ## 📁 Available Scripts
 
+### 0. `test-twenty-connection.ts` ⭐ **START HERE**
+Test connection to Twenty CRM API before running other scripts.
+
+**Use case:** Diagnose connection issues, verify API URL and API key
+
+**Run this first if you get errors!**
+
 ### 1. `upload-file-to-twenty-task.ts`
 Upload a file and attach it to a new Task.
 
@@ -13,6 +20,11 @@ Upload a file and attach it to a new Task.
 Upload a file and attach it to a new Opportunity.
 
 **Use case:** Attaching proposals, contracts, quotes to deals
+
+### 3. `simple-file-upload-test.ts`
+Simple test to upload a file without creating Task/Opportunity.
+
+**Use case:** Quick test of file upload functionality
 
 ---
 
@@ -270,7 +282,46 @@ export async function main() {
 
 ## 🔍 Troubleshooting
 
-### Error: "Failed to upload file"
+### ❌ Error: "Failed to create opportunity: Not Found" (404)
+
+**Cause:** GraphQL endpoint URL is incorrect
+
+**Solution:**
+1. Check your Twenty instance URL
+2. Update resource `u/chipvn/twenty` with correct URL
+
+**Correct URL formats:**
+- ✅ `https://[your-instance].twenty.com/graphql`
+- ✅ `https://crm.example.com/graphql` (self-hosted)
+- ✅ `http://localhost:3000/graphql` (local dev)
+
+**WRONG formats:**
+- ❌ `https://api.twenty.com/graphql` (this is just an example)
+- ❌ `https://twenty.com/graphql`
+- ❌ `https://[instance].twenty.com/rest/graphql`
+
+**How to find your URL:**
+1. Login to your Twenty CRM
+2. Open browser DevTools (F12)
+3. Go to Network tab
+4. Perform any action in Twenty (create task, etc.)
+5. Look for GraphQL request
+6. Copy the URL from that request
+
+**Quick test:**
+Run the `test-twenty-connection.ts` script first to diagnose connection issues.
+
+### ❌ Error: "401 Unauthorized"
+
+**Cause:** Invalid or expired API key
+
+**Solution:**
+1. Go to Twenty CRM
+2. Settings > Developers > API Keys
+3. Create new API key
+4. Update resource `u/chipvn/twenty` with new key
+
+### ❌ Error: "Failed to upload file"
 
 **Causes:**
 - Invalid API key
@@ -282,7 +333,7 @@ export async function main() {
 2. Check file size (reduce if needed)
 3. Increase Windmill timeout setting
 
-### Error: "GraphQL errors: Field 'opportunityId' not found"
+### ❌ Error: "GraphQL errors: Field 'opportunityId' not found"
 
 **Cause:** Trying to link attachment to non-existent opportunity
 
@@ -291,7 +342,7 @@ export async function main() {
 2. Then create attachment with the returned opportunity ID
 3. Or use the scripts which handle both steps automatically
 
-### Error: "Cannot read property 'getHeaders' of undefined"
+### ❌ Error: "Cannot read property 'getHeaders' of undefined"
 
 **Cause:** form-data library not imported correctly
 
@@ -300,6 +351,32 @@ export async function main() {
 // Add at top of script
 const FormData = (await import('form-data')).default;
 ```
+
+### 🔧 Debug Steps
+
+**Step 1: Test Connection**
+```bash
+# Run test-twenty-connection.ts script
+# This will diagnose:
+# - URL reachability
+# - GraphQL API working
+# - API key validity
+# - Query permissions
+```
+
+**Step 2: Check Resource Configuration**
+```json
+// u/chipvn/twenty should have:
+{
+  "apiUrl": "https://YOUR-INSTANCE.twenty.com/graphql",  // ← Check this!
+  "apiKey": "your-api-key-here"
+}
+```
+
+**Step 3: Verify Twenty Instance**
+- Open `https://YOUR-INSTANCE.twenty.com` in browser
+- Make sure you can login
+- Check if GraphQL endpoint exists: `https://YOUR-INSTANCE.twenty.com/graphql`
 
 ---
 
