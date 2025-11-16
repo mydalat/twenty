@@ -82,8 +82,8 @@ async function createTask(
   }
 ): Promise<Task> {
   const query = `
-    mutation CreateOneTask($data: TaskCreateInput!) {
-      createOneTask(data: $data) {
+    mutation CreateTask($data: TaskCreateInput!) {
+      createTask(data: $data) {
         id
         title
         body
@@ -122,7 +122,7 @@ async function createTask(
     throw new Error(`GraphQL errors: ${JSON.stringify(result.errors)}`);
   }
 
-  return result.data.createOneTask;
+  return result.data.createTask;
 }
 
 /**
@@ -209,8 +209,8 @@ async function createAttachment(
   }
 ): Promise<Attachment> {
   const query = `
-    mutation CreateOneAttachment($data: AttachmentCreateInput!) {
-      createOneAttachment(data: $data) {
+    mutation CreateAttachment($data: AttachmentCreateInput!) {
+      createAttachment(data: $data) {
         id
         name
         fullPath
@@ -252,7 +252,7 @@ async function createAttachment(
     throw new Error(`GraphQL errors: ${JSON.stringify(result.errors)}`);
   }
 
-  return result.data.createOneAttachment;
+  return result.data.createAttachment;
 }
 
 /**

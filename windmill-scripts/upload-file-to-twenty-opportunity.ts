@@ -87,8 +87,8 @@ async function createOpportunity(
   }
 ): Promise<Opportunity> {
   const query = `
-    mutation CreateOneOpportunity($data: OpportunityCreateInput!) {
-      createOneOpportunity(data: $data) {
+    mutation CreateOpportunity($data: OpportunityCreateInput!) {
+      createOpportunity(data: $data) {
         id
         name
         amount {
@@ -135,7 +135,7 @@ async function createOpportunity(
     throw new Error(`GraphQL errors: ${JSON.stringify(result.errors)}`);
   }
 
-  return result.data.createOneOpportunity;
+  return result.data.createOpportunity;
 }
 
 /**
@@ -222,8 +222,8 @@ async function createAttachment(
   }
 ): Promise<Attachment> {
   const query = `
-    mutation CreateOneAttachment($data: AttachmentCreateInput!) {
-      createOneAttachment(data: $data) {
+    mutation CreateAttachment($data: AttachmentCreateInput!) {
+      createAttachment(data: $data) {
         id
         name
         fullPath
@@ -265,7 +265,7 @@ async function createAttachment(
     throw new Error(`GraphQL errors: ${JSON.stringify(result.errors)}`);
   }
 
-  return result.data.createOneAttachment;
+  return result.data.createAttachment;
 }
 
 /**
