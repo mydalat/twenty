@@ -19,7 +19,6 @@ type FileUploadResponse = {
 type Task = {
   id: string;
   title: string;
-  body: string;
   status: string;
   createdAt: string;
 };
@@ -87,7 +86,6 @@ async function createTask(
   apiKey: string,
   taskData: {
     title: string;
-    body?: string;
     status?: string;
   }
 ): Promise<Task> {
@@ -96,7 +94,6 @@ async function createTask(
       createTask(data: $data) {
         id
         title
-        body
         status
         createdAt
       }
@@ -106,7 +103,6 @@ async function createTask(
   const variables = {
     data: {
       title: taskData.title,
-      body: taskData.body || '',
       status: taskData.status || 'TODO'
     }
   };
@@ -269,17 +265,16 @@ export async function main(
     // Generate random task
     const taskTitle = generateRandomTaskTitle();
     const timestamp = new Date().toISOString();
-    const taskBody = `Auto-generated test task with image attachment.\n\nCreated: ${timestamp}\nFrom: Windmill Script`;
 
     console.log(`\n📋 Task Details:`);
     console.log(`   Title: ${taskTitle}`);
     console.log(`   Status: TODO`);
+    console.log(`   Created: ${timestamp}`);
 
     // Step 1: Create Task
     console.log("\n📝 Step 1: Creating task...");
     const task = await createTask(twenty.apiUrl, twenty.apiKey, {
       title: taskTitle,
-      body: taskBody,
       status: 'TODO'
     });
     console.log(`✅ Task created successfully`);

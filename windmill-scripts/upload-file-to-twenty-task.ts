@@ -29,7 +29,6 @@ type FileUploadResponse = {
 type Task = {
   id: string;
   title: string;
-  body: string;
   status: string;
   createdAt: string;
 };
