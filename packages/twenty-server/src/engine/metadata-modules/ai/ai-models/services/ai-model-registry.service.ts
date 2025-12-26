@@ -113,6 +113,7 @@ export class AiModelRegistryService {
     const provider = createOpenAI({
       baseURL: baseUrl,
       apiKey: apiKey,
+      compatibility: 'compatible', // Force using Chat Completions API instead of Responses API
     });
 
     const modelNames = modelNamesString
